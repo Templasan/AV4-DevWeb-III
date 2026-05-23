@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 
@@ -29,12 +30,14 @@ public class DocumentoControle {
     private DocumentoModelador modelador;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<DocumentoExibirDTO> criar(@Valid @RequestBody DocumentoCadastrarDTO dto) {
         DocumentoExibirDTO documentoCriado = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(documentoCriado));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<DocumentoExibirDTO>> listar() {
         List<DocumentoExibirDTO> documentos = servico.buscarTodos();
         List<DocumentoExibirDTO> modelos = documentos.stream()
@@ -45,12 +48,14 @@ public class DocumentoControle {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<DocumentoExibirDTO> obterPorId(@PathVariable Long id) {
         DocumentoExibirDTO documento = servico.buscarPorIdDTO(id);
         return ResponseEntity.ok(modelador.toModel(documento));
     }
 
     @GetMapping("/usuario/{usuarioId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isProprioUsuario(#usuarioId)")
     public ResponseEntity<CollectionModel<DocumentoExibirDTO>> listarPorUsuario(@PathVariable Long usuarioId) {
         List<DocumentoExibirDTO> documentos = servico.buscarPorUsuario(usuarioId);
         
@@ -65,8 +70,9 @@ public class DocumentoControle {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<DocumentoExibirDTO> atualizar(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody DocumentoAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -75,6 +81,7 @@ public class DocumentoControle {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servico.excluir(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

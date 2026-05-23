@@ -7,12 +7,15 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import com.autobots.automanager.dtos.Telefone.TelefoneAtualizarDTO;
 import com.autobots.automanager.dtos.Telefone.TelefoneCadastrarDTO;
 import com.autobots.automanager.dtos.Telefone.TelefoneExibirDTO;
 import com.autobots.automanager.entidades.Telefone;
 import com.autobots.automanager.entidades.Usuario;
 import com.autobots.automanager.entidades.Empresa;
+import com.autobots.automanager.enumeracoes.PerfilUsuario;
 import com.autobots.automanager.excecoes.personalizado.EntidadeNaoEncontradaException;
 import com.autobots.automanager.modelo.Telefone.TelefoneAtualizador;
 import com.autobots.automanager.modelo.Telefone.TelefoneSelecionador;
@@ -21,6 +24,7 @@ import com.autobots.automanager.modelo.Empresa.EmpresaSelecionador;
 import com.autobots.automanager.repositorios.TelefoneRepositorio;
 import com.autobots.automanager.repositorios.UsuarioRepositorio;
 import com.autobots.automanager.repositorios.EmpresaRepositorio;
+import com.autobots.automanager.seguranca.ContextoSeguranca;
 
 @Service
 public class TelefoneServico {
@@ -83,6 +87,21 @@ public class TelefoneServico {
         novoTelefone.setDdd(dto.getDdd());
         novoTelefone.setNumero(dto.getNumero());
 
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            if ("EMPRESA".equalsIgnoreCase(dto.getTipoDono())) {
+                throw new AccessDeniedException("Vendedor não pode gerenciar telefones de empresas.");
+            }
+            if ("USUARIO".equalsIgnoreCase(dto.getTipoDono())) {
+                Usuario alvo = usuarioSelecionador.selecionar(dto.getIdDono());
+                boolean ehSiMesmo = logado.getId().equals(alvo.getId());
+                boolean ehCliente = alvo.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar telefones de clientes ou de si mesmo.");
+                }
+            }
+        }
+
         if ("USUARIO".equalsIgnoreCase(dto.getTipoDono())) {
             Usuario dono = usuarioSelecionador.selecionar(dto.getIdDono());
             dono.getTelefones().add(novoTelefone);
@@ -99,6 +118,28 @@ public class TelefoneServico {
 
     public void atualizarViaDTO(TelefoneAtualizarDTO dto) {
         Telefone telefone = selecionador.selecionar(dto.getId());
+
+        Usuario logadoAtualizar = ContextoSeguranca.getUsuario();
+        if (logadoAtualizar != null && logadoAtualizar.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            // Verifica se o telefone pertence a uma empresa
+            boolean pertenceEmpresa = empresaRepositorio.findAll().stream()
+                    .anyMatch(e -> e.getTelefones().stream().anyMatch(t -> t.getId().equals(dto.getId())));
+            if (pertenceEmpresa) {
+                throw new AccessDeniedException("Vendedor não pode gerenciar telefones de empresas.");
+            }
+            // Verifica se o usuário dono é CLIENTE ou si mesmo
+            Usuario donoTelefone = usuarioRepositorio.findAll().stream()
+                    .filter(u -> u.getTelefones().stream().anyMatch(t -> t.getId().equals(dto.getId())))
+                    .findFirst().orElse(null);
+            if (donoTelefone != null) {
+                boolean ehSiMesmo = logadoAtualizar.getId().equals(donoTelefone.getId());
+                boolean ehCliente = donoTelefone.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar telefones de clientes ou de si mesmo.");
+                }
+            }
+        }
+
         Telefone dados = new Telefone();
         dados.setDdd(dto.getDdd());
         dados.setNumero(dto.getNumero());

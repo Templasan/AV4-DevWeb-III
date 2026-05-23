@@ -39,7 +39,8 @@ public class UsuarioModelador implements RepresentationModelAssembler<UsuarioExi
 
         // Entidades relacionadas ao usuário por papel
         usuario.add(linkTo(methodOn(VeiculoControle.class).listarPorProprietario(id)).withRel("veiculos"));
-        usuario.add(linkTo(methodOn(VendaControle.class).listarPorUsuario(id)).withRel("vendas"));
+        usuario.add(linkTo(methodOn(VendaControle.class).listarPorUsuarioComoCliente(id)).withRel("vendas-como-cliente"));
+        usuario.add(linkTo(methodOn(VendaControle.class).listarPorUsuarioComoFuncionario(id)).withRel("vendas-como-funcionario"));
         usuario.add(linkTo(methodOn(MercadoriaControle.class).listarPorFornecedor(id)).withRel("mercadorias_fornecidas"));
 
         // Sub-modela emails com seus próprios links HATEOAS

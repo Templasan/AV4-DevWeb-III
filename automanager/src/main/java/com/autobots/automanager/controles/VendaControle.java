@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -30,12 +31,14 @@ public class VendaControle {
     private VendaModelador modelador;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<VendaExibirDTO> criar(@Valid @RequestBody VendaCadastrarDTO dto) {
         VendaExibirDTO vendaCriada = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(vendaCriada));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<VendaExibirDTO>> listar() {
         List<VendaExibirDTO> vendas = servico.buscarTodos();
         List<VendaExibirDTO> modelos = vendas.stream()
@@ -47,24 +50,35 @@ public class VendaControle {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isParticipanteVenda(#id)")
     public ResponseEntity<VendaExibirDTO> obterPorId(@PathVariable Long id) {
         VendaExibirDTO vendaDTO = servico.buscarPorIdDTO(id);
         return ResponseEntity.ok(modelador.toModel(vendaDTO));
     }
 
     @GetMapping("/empresa/{empresaId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<VendaExibirDTO>> listarPorEmpresa(@PathVariable Long empresaId) {
         List<VendaExibirDTO> vendas = servico.listarPorEmpresa(empresaId);
         return converterParaCollection(vendas, "vendas-empresa");
     }
 
-    @GetMapping("/usuario/{usuarioId}")
-    public ResponseEntity<CollectionModel<VendaExibirDTO>> listarPorUsuario(@PathVariable Long usuarioId) {
-        List<VendaExibirDTO> vendas = servico.listarPorUsuario(usuarioId);
-        return converterParaCollection(vendas, "vendas-usuario");
+    @GetMapping("/usuario/{usuarioId}/cliente")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isProprioUsuario(#usuarioId)")
+    public ResponseEntity<CollectionModel<VendaExibirDTO>> listarPorUsuarioComoCliente(@PathVariable Long usuarioId) {
+        List<VendaExibirDTO> vendas = servico.listarPorUsuarioComoCliente(usuarioId);
+        return converterParaCollection(vendas, "vendas-como-cliente");
+    }
+
+    @GetMapping("/usuario/{usuarioId}/funcionario")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isProprioUsuario(#usuarioId)")
+    public ResponseEntity<CollectionModel<VendaExibirDTO>> listarPorUsuarioComoFuncionario(@PathVariable Long usuarioId) {
+        List<VendaExibirDTO> vendas = servico.listarPorUsuarioComoFuncionario(usuarioId);
+        return converterParaCollection(vendas, "vendas-como-funcionario");
     }
 
     @GetMapping("/veiculo/{veiculoId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<VendaExibirDTO>> listarPorVeiculo(@PathVariable Long veiculoId) {
         List<VendaExibirDTO> vendas = servico.listarPorVeiculo(veiculoId);
         return converterParaCollection(vendas, "vendas-veiculo");
@@ -76,13 +90,18 @@ public class VendaControle {
                 .map(modelador::toModel)
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(CollectionModel.of(modelos, 
-                linkTo(methodOn(VendaControle.class).listar()).withRel(rel)));
+        CollectionModel<VendaExibirDTO> collection = CollectionModel.of(modelos,
+                linkTo(methodOn(VendaControle.class).listar()).withRel(rel));
+        // Adicionar link self
+        collection.add(linkTo(methodOn(VendaControle.class).listar()).withSelfRel());
+
+        return ResponseEntity.ok(collection);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> atualizar(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody VendaAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -91,6 +110,7 @@ public class VendaControle {
     }
 
     @PostMapping("/{id}/mercadorias/{mercadoriaId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> adicionarMercadoria(
             @PathVariable Long id,
             @PathVariable Long mercadoriaId) {
@@ -100,6 +120,7 @@ public class VendaControle {
     }
 
     @DeleteMapping("/{id}/mercadorias/{mercadoriaId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> removerMercadoria(
             @PathVariable Long id,
             @PathVariable Long mercadoriaId) {
@@ -109,6 +130,7 @@ public class VendaControle {
     }
 
     @PostMapping("/{id}/servicos/{servicoId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> adicionarServico(
             @PathVariable Long id,
             @PathVariable Long servicoId) {
@@ -118,6 +140,7 @@ public class VendaControle {
     }
 
     @DeleteMapping("/{id}/servicos/{servicoId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> removerServico(
             @PathVariable Long id,
             @PathVariable Long servicoId) {
@@ -127,6 +150,7 @@ public class VendaControle {
     }
 
     @PostMapping("/{id}/veiculo/{veiculoId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> adicionarVeiculo(
             @PathVariable Long id,
             @PathVariable Long veiculoId) {
@@ -136,6 +160,7 @@ public class VendaControle {
     }
 
     @DeleteMapping("/{id}/veiculo")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<VendaExibirDTO> removerVeiculo(@PathVariable Long id) {
         servico.removerVeiculo(id);
         VendaExibirDTO atualizada = servico.buscarPorIdDTO(id);
@@ -143,6 +168,7 @@ public class VendaControle {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isVendedorDaVenda(#id)")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servico.excluir(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

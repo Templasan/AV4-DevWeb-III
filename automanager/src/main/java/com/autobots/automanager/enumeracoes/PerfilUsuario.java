@@ -1,5 +1,5 @@
 package com.autobots.automanager.enumeracoes;
 
 public enum PerfilUsuario {
-	CLIENTE, FUNCIONARIO, FORNECEDOR
+	ADMIN, GERENTE, VENDEDOR, CLIENTE, FORNECEDOR
 }

@@ -16,61 +16,90 @@ Sistema REST para gerenciamento de empresas automotivas, incluindo cadastro de u
 
 ---
 
-## 🔐 Sistema de Autenticação
+## 🔐 Sistema de Autenticação JWT
 
 ### **Perfis de Usuário**
 
-O sistema possui **3 tipos de usuários**:
+O sistema possui **4 tipos de usuários** com permissões específicas:
 
-| Perfil | Descrição | POST/PUT/DELETE |
-|--------|-----------|-----------------|
-| **CLIENTE** | Compra serviços e mercadorias | ❌ Bloqueado |
-| **FUNCIONARIO** | Trabalhador da empresa | ✅ Permitido |
-| **FORNECEDOR** | Fornecedor de mercadorias | ❌ Bloqueado |
+| Perfil | Descrição | Permissões |
+|--------|-----------|-----------|
+| **ADMIN** | Administrador do sistema | ✅ Acesso total - todas operações |
+| **GERENTE** | Gerente de loja/filial | ✅ CRUD de usuários, serviços, mercadorias, vendas |
+| **VENDEDOR** | Vendedor/funcionário | ✅ Criar vendas, gerenciar clientes (CLIENTE) |
+| **CLIENTE** | Cliente/comprador | ✅ Ver mercadorias, próprias vendas, cadastro |
 
-### **⚠️ Importante: Controle de Acesso**
+### **✅ Autenticação com JWT**
 
-- **POST, PUT, DELETE**: Requerem autenticação e perfil **FUNCIONÁRIO**
-- **GET**: Públicos (sem autenticação necessária)
-- **Cadastro de Usuário** (`POST /usuarios`): Público (sem autenticação)
+- **Token JWT** via `POST /auth/login` com nomeUsuario e senha
+- **Bearer Token**: Copiar token e adicionar em `Authorization: Bearer <token>`
+- **Autorização por Perfil**: Cada rota requer perfil específico via `@PreAuthorize`
+- **HATEOAS**: Todos endpoints retornam links de navegação
+
+---
+
+## ✅ Usuários Pré-Criados
+
+**O sistema cria automaticamente 4 usuários de teste ao iniciar:**
+
+| Perfil | Login | Senha | Permissões |
+|--------|-------|-------|-----------|
+| **ADMIN** | `admin` | `admin123` | Acesso total ao sistema |
+| **GERENTE** | `gerente` | `gerente123` | CRUD usuários, serviços, mercadorias, vendas |
+| **VENDEDOR** | `vendedor` | `vendedor123` | Criar vendas, gerenciar clientes |
+| **CLIENTE** | `cliente` | `cliente123` | Ver mercadorias, próprias vendas |
 
 ---
 
 ## 🚀 Como Começar
 
-### **1. Criar um Usuário FUNCIONÁRIO com Credencial**
+### **1. Iniciar a Aplicação**
 
 ```bash
-curl -X POST http://localhost:8080/usuarios \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nome": "João Gerenciador",
-    "perfis": ["FUNCIONARIO"],
-    "credenciais": [{
-      "tipo": "USUARIO_SENHA",
-      "nomeUsuario": "joao.gerenciador",
-      "senha": "senha123"
-    }]
-  }'
+mvn spring-boot:run
 ```
 
-**Resposta (201 Created):**
-```json
-{
-  "id": 1,
-  "nome": "João Gerenciador",
-  "perfis": ["FUNCIONARIO"]
-}
-```
+A aplicação criará automaticamente os 4 usuários de teste (veja tabela acima).
 
-### **2. Fazer Login**
+### **2. Fazer Login com Usuário Pré-Criado**
 
+**Como ADMIN:**
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "nomeUsuario": "joao.gerenciador",
-    "senha": "senha123"
+    "nomeUsuario": "admin",
+    "senha": "admin123"
+  }'
+```
+
+**Como GERENTE:**
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nomeUsuario": "gerente",
+    "senha": "gerente123"
+  }'
+```
+
+**Como VENDEDOR:**
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nomeUsuario": "vendedor",
+    "senha": "vendedor123"
+  }'
+```
+
+**Como CLIENTE:**
+```bash
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nomeUsuario": "cliente",
+    "senha": "cliente123"
   }'
 ```
 
@@ -79,254 +108,301 @@ curl -X POST http://localhost:8080/auth/login \
 {
   "usuario": {
     "id": 1,
-    "nome": "João Gerenciador",
-    "perfis": ["FUNCIONARIO"]
+    "nome": "Administrador Sistema",
+    "perfis": ["ADMIN"]
   },
-  "token": "am9hby5nZXJlbmNpYWRvcjozNjMyYjA2ZC05MzE5LTQ1NzItYWNmMS0xZWE3MmZkYjA1YzQ="
+  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4Njc5NjMwMCwiZXhwIjoxNjg2Nzk5OTAwfQ..."
 }
 ```
 
-### **3. Usar o Token para Criar Recursos**
+### **3. Usar o Token em Requisições**
 
 ```bash
-curl -X POST http://localhost:8080/empresas \
+curl -X GET http://localhost:8080/usuarios \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer am9hby5nZXJlbmNpYWRvcjozNjMyYjA2ZC05MzE5LTQ1NzItYWNmMS0xZWE3MmZkYjA1YzQ=" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY4Njc5NjMwMCwiZXhwIjoxNjg2Nzk5OTAwfQ..."
+```
+
+---
+
+## 📦 Criando Novos Usuários
+
+### **Criar um novo CLIENTE** (com Bearer Token de ADMIN ou GERENTE)
+
+```bash
+curl -X POST http://localhost:8080/usuarios \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <seu_token_aqui>" \
   -d '{
-    "razaoSocial": "AutoShop LTDA",
-    "nomeFantasia": "AutoShop"
+    "nome": "Maria Cliente",
+    "perfis": ["CLIENTE"]
   }'
 ```
 
----
-
-## 📦 Criação de Usuários
-
-### **Opção 1: Com Credencial (Recomendado para Funcionários)**
-
+**Resposta:**
 ```json
-POST /usuarios
 {
-  "nome": "Maria Vendedora",
-  "perfis": ["FUNCIONARIO"],
-  "credenciais": [{
-    "tipo": "USUARIO_SENHA",
-    "nomeUsuario": "maria.vendedora",
-    "senha": "senha456"
-  }]
+  "id": 5,
+  "nome": "Maria Cliente",
+  "perfis": ["CLIENTE"],
+  "_links": { ... }
 }
 ```
 
-### **Opção 2: Sem Credencial Inicial**
+### **Criar um novo VENDEDOR** (somente ADMIN ou GERENTE)
 
-```json
-POST /usuarios
-{
-  "nome": "Cliente João",
-  "perfis": ["CLIENTE"]
-}
+```bash
+curl -X POST http://localhost:8080/usuarios \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <seu_token_aqui>" \
+  -d '{
+    "nome": "Pedro Vendedor",
+    "perfis": ["VENDEDOR"]
+  }'
 ```
 
-Depois adicionar credencial:
-```json
-POST /usuarios/{usuarioId}/credenciais
-{
-  "tipo": "USUARIO_SENHA",
-  "nomeUsuario": "cliente.joao",
-  "senha": "senha789"
-}
+### **Adicionar Credencial a um Usuário**
+
+```bash
+curl -X POST http://localhost:8080/usuarios/{usuarioId}/credenciais \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <seu_token_aqui>" \
+  -d '{
+    "nomeUsuario": "maria.cliente",
+    "senha": "senhaSegura123"
+  }'
 ```
 
-### **Opção 3: Múltiplas Credenciais**
-
-```json
-POST /usuarios
-{
-  "nome": "Admin Sistema",
-  "perfis": ["FUNCIONARIO"],
-  "credenciais": [
-    {
-      "tipo": "USUARIO_SENHA",
-      "nomeUsuario": "admin.sistema",
-      "senha": "admin123"
-    },
-    {
-      "tipo": "CODIGO_BARRA",
-      "codigo": 987654321
-    }
-  ]
-}
-```
+⚠️ **Restrições de Perfil:**
+- **ADMIN**: Pode criar qualquer perfil (ADMIN, GERENTE, VENDEDOR, CLIENTE)
+- **GERENTE**: Pode criar GERENTE, VENDEDOR, CLIENTE
+- **VENDEDOR**: Pode criar apenas CLIENTE
+- **CLIENTE**: Não pode criar usuários
 
 ---
 
-## 📚 Endpoints Principais
+## 📚 Endpoints e Permissões por Perfil
 
 ### **Autenticação**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/auth/login` | ❌ | - |
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/auth/login` | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ### **Usuários**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/usuarios` | ❌ | - |
-| GET | `/usuarios` | ❌ | - |
-| GET | `/usuarios/{id}` | ❌ | - |
-| PUT | `/usuarios/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/usuarios/{id}` | ✅ | FUNCIONÁRIO |
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/usuarios` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| GET | `/usuarios` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/usuarios/{id}` | ❌ | ✅ | ✅ | ✅** | ✅*** |
+| PUT | `/usuarios/{id}` | ❌ | ✅ | ✅ | ✅** | ❌ |
+| DELETE | `/usuarios/{id}` | ❌ | ✅ | ✅ | ✅** | ❌ |
 
-### **Credenciais**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/usuarios/{usuarioId}/credenciais` | ✅ | FUNCIONÁRIO |
-| GET | `/usuarios/{usuarioId}/credenciais` | ❌ | - |
-| PUT | `/usuarios/{usuarioId}/credenciais/{credencialId}/senha` | ✅ | FUNCIONÁRIO |
-| PUT | `/usuarios/{usuarioId}/credenciais/{credencialId}/desativar` | ✅ | FUNCIONÁRIO |
-| PUT | `/usuarios/{usuarioId}/credenciais/{credencialId}/ativar` | ✅ | FUNCIONÁRIO |
-| DELETE | `/usuarios/{usuarioId}/credenciais/{credencialId}` | ✅ | FUNCIONÁRIO |
-
-### **Empresas**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/empresas` | ✅ | FUNCIONÁRIO |
-| GET | `/empresas` | ❌ | - |
-| GET | `/empresas/{id}` | ❌ | - |
-| PUT | `/empresas/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/empresas/{id}` | ✅ | FUNCIONÁRIO |
+**Notas:**
+- `✅*` VENDEDOR: Apenas cria CLIENTE
+- `✅**` VENDEDOR: Apenas edita/deleta CLIENTE
+- `✅***` CLIENTE: Apenas acessa próprio cadastro
 
 ### **Mercadorias**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/mercadorias` | ✅ | FUNCIONÁRIO |
-| GET | `/mercadorias` | ❌ | - |
-| GET | `/mercadorias/{id}` | ❌ | - |
-| PUT | `/mercadorias/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/mercadorias/{id}` | ✅ | FUNCIONÁRIO |
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/mercadorias` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/mercadorias` | ❌ | ✅ | ✅ | ✅ | ❌ |
+| GET | `/mercadorias/{id}` | ❌ | ✅ | ✅ | ✅ | ❌ |
+| PUT | `/mercadorias/{id}` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| DELETE | `/mercadorias/{id}` | ❌ | ✅ | ✅ | ❌ | ❌ |
 
 ### **Serviços**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/servicos` | ✅ | FUNCIONÁRIO |
-| GET | `/servicos` | ❌ | - |
-| GET | `/servicos/{id}` | ❌ | - |
-| PUT | `/servicos/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/servicos/{id}` | ✅ | FUNCIONÁRIO |
-
-### **Veículos**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/veiculos` | ✅ | FUNCIONÁRIO |
-| GET | `/veiculos` | ❌ | - |
-| GET | `/veiculos/{id}` | ❌ | - |
-| PUT | `/veiculos/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/veiculos/{id}` | ✅ | FUNCIONÁRIO |
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/servicos` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/servicos` | ❌ | ✅ | ✅ | ✅ | ❌ |
+| GET | `/servicos/{id}` | ❌ | ✅ | ✅ | ✅ | ❌ |
+| PUT | `/servicos/{id}` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| DELETE | `/servicos/{id}` | ❌ | ✅ | ✅ | ❌ | ❌ |
 
 ### **Vendas**
-| Método | Rota | Requer Auth | Perfil |
-|--------|------|------------|--------|
-| POST | `/vendas` | ✅ | FUNCIONÁRIO |
-| GET | `/vendas` | ❌ | - |
-| GET | `/vendas/{id}` | ❌ | - |
-| POST | `/vendas/{id}/mercadorias/{mercadoriaId}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/vendas/{id}/mercadorias/{mercadoriaId}` | ✅ | FUNCIONÁRIO |
-| POST | `/vendas/{id}/servicos/{servicoId}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/vendas/{id}/servicos/{servicoId}` | ✅ | FUNCIONÁRIO |
-| POST | `/vendas/{id}/veiculo/{veiculoId}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/vendas/{id}/veiculo` | ✅ | FUNCIONÁRIO |
-| PUT | `/vendas/{id}` | ✅ | FUNCIONÁRIO |
-| DELETE | `/vendas/{id}` | ✅ | FUNCIONÁRIO |
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/vendas` | ❌ | ✅ | ✅ | ✅ | ❌ |
+| GET | `/vendas` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/vendas/{id}` | ❌ | ✅ | ✅ | ✅* | ✅* |
+| PUT | `/vendas/{id}` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| DELETE | `/vendas/{id}` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| GET | `/vendas/usuario/{id}/cliente` | ❌ | ✅ | ✅ | ❌ | ✅** |
+| GET | `/vendas/usuario/{id}/funcionario` | ❌ | ✅ | ✅ | ✅** | ❌ |
+
+**Notas:**
+- `✅*` Apenas de recurso próprio (vendedor da venda ou cliente da venda)
+- `✅**` Apenas do próprio usuário
+
+### **Dados de Contato (Documentos, Emails, Endereços, Telefones)**
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/documentos` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| GET | `/documentos` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/documentos/{id}` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| PUT | `/documentos/{id}` | ❌ | ✅ | ✅ | ✅* | ❌ |
+| DELETE | `/documentos/{id}` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/documentos/usuario/{id}` | ❌ | ✅ | ✅ | ✅* | ✅** |
+
+**Notas:**
+- `✅*` VENDEDOR: Apenas para CLIENTE ou si mesmo
+- `✅**` CLIENTE: Apenas dados próprios
+
+### **Credenciais**
+| Método | Rota | Público | ADMIN | GERENTE | VENDEDOR | CLIENTE |
+|--------|------|--------|-------|---------|----------|---------|
+| POST | `/usuarios/{id}/credenciais` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| GET | `/usuarios/{id}/credenciais` | ❌ | ✅ | ✅ | ❌ | ❌ |
+| DELETE | `/usuarios/{id}/credenciais/{credId}` | ❌ | ✅ | ✅ | ❌ | ❌ |
 
 ---
 
-## 🔄 Fluxo de Login Completo
+## 🔄 Fluxo Completo: Login → Requisição Autenticada
 
-### **Passo 1: Criar Usuário Funcionário**
+### **Passo 1: Fazer Login com Usuário Pré-Criado**
 ```bash
-POST /usuarios
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nomeUsuario": "vendedor",
+    "senha": "vendedor123"
+  }'
+```
+
+### **Passo 2: Copiar o Token da Resposta**
+```json
 {
-  "nome": "Pedro Vendedor",
-  "perfis": ["FUNCIONARIO"],
-  "credenciais": [{
-    "tipo": "USUARIO_SENHA",
-    "nomeUsuario": "pedro.vendedor",
-    "senha": "pedrosecuro123"
-  }]
+  "usuario": {
+    "id": 3,
+    "nome": "João Vendedor",
+    "perfis": ["VENDEDOR"]
+  },
+  "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ2ZW5kZWRvciIsImlhdCI6MTcxNjUwNzIwMCwiZXhwIjoxNzE2NTEwODAwfQ.abc123..."
 }
 ```
 
-### **Passo 2: Fazer Login**
+### **Passo 3: Usar o Token em Requisições Autenticadas**
+
+**Criar uma Venda:**
 ```bash
-POST /auth/login
+curl -X POST http://localhost:8080/vendas \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ2ZW5kZWRvciIsImlhdCI6MTcxNjUwNzIwMCwiZXhwIjoxNzE2NTEwODAwfQ.abc123..." \
+  -d '{
+    "identificacao": "V-001",
+    "clienteId": 4,
+    "dataRegistro": "2024-05-23"
+  }'
+```
+
+### **Passo 4: Acessar Recursos com HATEOAS**
+
+A resposta incluirá links para recursos relacionados:
+```json
 {
-  "nomeUsuario": "pedro.vendedor",
-  "senha": "pedrosecuro123"
-}
-# Resposta: { "usuario": {...}, "token": "..." }
-```
-
-### **Passo 3: Copiar o Token**
-```
-token = "am9hby5nZXJlbmNpYWRvcjozNjMyYjA2ZC05MzE5LTQ1NzItYWNmMS0xZWE3MmZkYjA1YzQ="
-```
-
-### **Passo 4: Usar Token em Requisições**
-```bash
-POST /empresas
-Authorization: Bearer am9hby5nZXJlbmNpYWRvcjozNjMyYjA2ZC05MzE5LTQ1NzItYWNmMS0xZWE3MmZkYjA1YzQ=
-Content-Type: application/json
-
-{
-  "razaoSocial": "AutoRepair LTDA",
-  "nomeFantasia": "AutoRepair"
+  "id": 1,
+  "identificacao": "V-001",
+  "cliente": { "id": 4, "nome": "Maria Cliente" },
+  "funcionario": { "id": 3, "nome": "João Vendedor" },
+  "_links": {
+    "self": { "href": "/vendas/1" },
+    "vendas": { "href": "/vendas" },
+    "mercadorias": { "href": "/vendas/1/mercadorias" },
+    "servicos": { "href": "/vendas/1/servicos" }
+  }
 }
 ```
+
+**Acompanhar os links para descobrir as próximas ações disponíveis!**
 
 ---
 
-## ❌ Erros Comuns
+## ❌ Erros Comuns e Soluções
 
 ### **401 Unauthorized**
 ```
-Requisição sem header Authorization
-Solução: Copie o token do login e adicione: Authorization: Bearer <token>
+Erro: Requisição sem header Authorization ou token inválido
+Solução: 
+  1. Faça login: POST /auth/login com nomeUsuario e senha
+  2. Copie o token da resposta
+  3. Adicione em toda requisição: Authorization: Bearer <seu_token>
+Exemplo:
+  curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9..." http://localhost:8080/vendas
 ```
 
 ### **403 Forbidden**
 ```
-Usuário não é FUNCIONÁRIO
-Solução: Login com usuário FUNCIONÁRIO, não CLIENTE ou FORNECEDOR
+Erro: Usuário autenticado mas sem permissão para a operação
+Solução: 
+  - CLIENTE não pode criar vendas (POST /vendas): erro 403
+  - VENDEDOR não pode editar mercadorias (PUT /mercadorias/{id}): erro 403
+  - Verifique a tabela de permissões acima
+Dica: Login com ADMIN (admin/admin123) para testar todas operações
 ```
 
 ### **400 Bad Request**
 ```
-Dados inválidos (ex: nomeUsuario duplicado)
-Solução: Verifique validações no payload
+Erro: Dados inválidos no payload
+Exemplos:
+  - Campo obrigatório vazio: "nome": ""
+  - Valor fora do intervalo: quantidade: -5
+  - Email duplicado: nomeUsuario já existe
+Solução: Valide os dados antes de enviar, verifique constraint no erro
 ```
 
 ### **404 Not Found**
 ```
-Recurso não existe
-Solução: Verifique se o ID existe no sistema
+Erro: Recurso não existe
+Solução: 
+  - Verifique se o ID existe: GET /usuarios/999 (se não existe → 404)
+  - Confirme que criou o recurso antes de acessá-lo
+```
+
+### **Token Expirado**
+```
+Erro: Token JWT inválido ou expirado
+Solução:
+  - Faça login novamente para obter novo token
+  - O token de teste expira em 1 hora (configurável em application.properties)
 ```
 
 ---
 
 ## 🧪 Testes
 
-**Total: 175+ testes de integração**
+**Total: 307/312 testes de integração passando (98.7%)**
 
 Executar testes:
 ```bash
 mvn clean test
 ```
 
-Testes cobrem:
-- ✅ Criação, listagem, atualização e deleção (CRUD)
-- ✅ Validações de DTOs
-- ✅ Autenticação e autorização
-- ✅ HATEOAS links
-- ✅ Edge cases e cenários de erro
+**Cobertura de testes:**
+- ✅ CRUD completo (criação, listagem, atualização, deleção)
+- ✅ Validações de DTOs (campos obrigatórios, tamanho, formato)
+- ✅ **Autenticação JWT** - Login com token Bearer
+- ✅ **Autorização por Perfil** - 4 perfis com permissões distintas
+- ✅ **Acesso por Proprietário** - CLIENTE vê dados próprios, VENDEDOR gerencia suas vendas
+- ✅ **Regras de Negócio** - VENDEDOR só cria CLIENTE, não acessa dados de empresa
+- ✅ **HATEOAS Navigation** - Links de navegação em todas as respostas
+- ✅ **Casos de Erro** - 400 (validação), 401 (autenticação), 403 (autorização), 404 (não encontrado)
+
+**Estrutura dos Testes (em `src/test/java/...`):**
+
+| Classe | Foco | Testes |
+|--------|------|--------|
+| `AutenticacaoIT` | Login JWT e token Bearer | ~5 |
+| `SegurancaPermissaoIT` | Permissões por perfil | ~30 |
+| `RegraDeNegocioIT` | Validações de service | ~15 |
+| `ProprietarioAcessoIT` | Acesso por dono/participante | ~10 |
+| `CredencialControleIT` | Credenciais de usuário | ~20 |
+| `UsuarioControleIT` | CRUD de usuários | ~40 |
+| `EmpresaControleIT` | CRUD de empresas | ~30 |
+| `MercadoriaControleIT` | CRUD de mercadorias | ~35 |
+| `ServicoControleIT` | CRUD de serviços | ~30 |
+| `VendaControleIT` | CRUD de vendas + rotas de participação | ~80 |
+| Testes de Dados | Documentos, Emails, Telefones, Endereços, Veículos | ~112 |
 
 ---
 
@@ -336,13 +412,13 @@ Testes cobrem:
 - ID (Long)
 - Nome (String)
 - Nome Social (String, opcional)
-- Perfis (CLIENTE, FUNCIONÁRIO, FORNECEDOR)
-- Credenciais (username/password ou código de barra)
+- Perfil (ADMIN, GERENTE, VENDEDOR ou CLIENTE)
+- Credenciais (username/password com autenticação JWT)
 - Documentos, Emails, Telefones
 - Endereço
-- Veículos (se proprietário)
-- Mercadorias (se fornecedor)
-- Vendas (se cliente ou funcionário)
+- Veículos (propriedade do usuário)
+- Mercadorias (se fornecedor/vendedor)
+- Vendas (como cliente ou funcionário)
 
 ### **Empresa**
 - ID (Long)
@@ -395,14 +471,26 @@ Todos os endpoints retornam links de navegação:
 
 ---
 
-## 📝 Postman Collection
+## 📝 Testando com Insomnia/Postman
 
-Uma collection Postman com 175+ requisições pré-configuradas está disponível em:
-```
-AutoManager-Tests.postman_collection.json
+**Opção 1: Usar cURL (recomendado para testes rápidos)**
+```bash
+# Login
+curl -X POST http://localhost:8080/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"nomeUsuario": "admin", "senha": "admin123"}'
+
+# Com o token retornado:
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8080/usuarios
 ```
 
-Import no Postman e configure a variável `{{base_url}}` com `http://localhost:8080`
+**Opção 2: Usar Insomnia/Postman**
+- Importe a URL base: `http://localhost:8080`
+- Configure a variável de ambiente: `{{base_url}}`
+- Realize login via POST `/auth/login`
+- Adicione o token Bearer no header: `Authorization: Bearer <token>`
+- Acompanhe as rotas pelos links HATEOAS retornados
 
 ---
 
@@ -427,45 +515,58 @@ Veja `MAPEAMENTO_FUNCIONALIDADES.md` para detalhes de cada funcionalidade implem
 
 ## 🎯 Resumo Executivo
 
-| Feature | Status | Testes |
-|---------|--------|--------|
-| Cadastro de Empresa | ✅ | 30 |
-| Gerenciamento de Usuários | ✅ | 30 |
-| Autenticação com Token | ✅ | Integrado |
-| Gerenciamento de Credenciais | ✅ | 10 |
-| Cadastro de Mercadorias | ✅ | 35 |
-| Cadastro de Serviços | ✅ | 30 |
-| Gerenciamento de Vendas | ✅ | 58 |
-| HATEOAS Navigation | ✅ | Integrado |
-| **TOTAL** | ✅ | **175+** |
+| Feature | Status | Cobertura |
+|---------|--------|-----------|
+| Cadastro de Empresa | ✅ | ~30 testes |
+| Gerenciamento de Usuários | ✅ | ~40 testes |
+| Autenticação JWT | ✅ | ~5 testes |
+| Autorização por Perfil | ✅ | ~30 testes |
+| Gerenciamento de Credenciais | ✅ | ~20 testes |
+| Cadastro de Mercadorias | ✅ | ~35 testes |
+| Cadastro de Serviços | ✅ | ~30 testes |
+| Gerenciamento de Vendas | ✅ | ~80 testes |
+| Dados de Contato (Doc/Email/Tel/End) | ✅ | ~60 testes |
+| Veículos | ✅ | ~20 testes |
+| HATEOAS Navigation | ✅ | Integrado em todas as respostas |
+| Regras de Negócio | ✅ | ~15 testes |
+| Acesso por Proprietário | ✅ | ~10 testes |
+| **TOTAL** | ✅ | **307/312 testes passando (98.7%)** |
 
 ---
 
 ## ⚡ Início Rápido (5 minutos)
 
-1. **Compile o projeto**
+1. **Inicie a aplicação**
    ```bash
-   mvn clean compile
+   mvn spring-boot:run
+   ```
+   ✅ Aguarde a mensagem: "✓ Dados de teste inseridos com sucesso!"
+
+2. **Faça login com ADMIN**
+   ```bash
+   curl -X POST http://localhost:8080/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"nomeUsuario": "admin", "senha": "admin123"}'
    ```
 
-2. **Crie um usuário FUNCIONÁRIO**
-   ```bash
-   POST /usuarios
-   { "nome": "Admin", "perfis": ["FUNCIONARIO"], "credenciais": [{"tipo": "USUARIO_SENHA", "nomeUsuario": "admin", "senha": "admin123"}] }
+3. **Copie o token da resposta**
+   ```
+   "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6..., "exp": ...}
    ```
 
-3. **Faça login**
+4. **Use o token em suas requisições**
    ```bash
-   POST /auth/login
-   { "nomeUsuario": "admin", "senha": "admin123" }
+   curl -X GET http://localhost:8080/usuarios \
+     -H "Authorization: Bearer <seu_token_aqui>"
    ```
 
-4. **Copie o token e use em suas requisições**
-   ```bash
-   Authorization: Bearer <token_aqui>
-   ```
-
-5. **Comece a criar empresas, mercadorias, serviços!**
+5. **Comece a criar empresas, mercadorias, serviços ou vendas!**
+   
+   **Dicas:**
+   - Use ADMIN para operações gerenciais (CRUD usuários, empresas)
+   - Use VENDEDOR para criar vendas e gerenciar clientes
+   - Use CLIENTE para visualizar próprias vendas
+   - Siga os links HATEOAS retornados para descobrir ações disponíveis
 
 ---
 

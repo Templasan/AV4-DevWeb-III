@@ -26,10 +26,11 @@ public class VendaModelador implements RepresentationModelAssembler<VendaExibirD
         // Navegação para cliente e funcionário
         if (dto.getClienteId() != null) {
             dto.add(linkTo(methodOn(UsuarioControle.class).obterPorId(dto.getClienteId())).withRel("cliente"));
-            dto.add(linkTo(methodOn(VendaControle.class).listarPorUsuario(dto.getClienteId())).withRel("vendas_do_cliente"));
+            dto.add(linkTo(methodOn(VendaControle.class).listarPorUsuarioComoCliente(dto.getClienteId())).withRel("vendas_do_cliente"));
         }
         if (dto.getFuncionarioId() != null) {
             dto.add(linkTo(methodOn(UsuarioControle.class).obterPorId(dto.getFuncionarioId())).withRel("funcionario"));
+            dto.add(linkTo(methodOn(VendaControle.class).listarPorUsuarioComoFuncionario(dto.getFuncionarioId())).withRel("vendas_do_funcionario"));
         }
 
         // Navegação para o veículo

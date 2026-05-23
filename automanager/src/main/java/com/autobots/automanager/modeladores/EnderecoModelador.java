@@ -32,6 +32,7 @@ public class EnderecoModelador implements RepresentationModelAssembler<EnderecoE
         // 5. Link para o usuário dono
         if (idDono != null) {
             dto.add(linkTo(methodOn(UsuarioControle.class).obterPorId(idDono)).withRel("dono"));
+            dto.add(linkTo(methodOn(EnderecoControle.class).obterPorUsuario(idDono)).withRel("endereco_do_dono"));
         }
 
         return dto;

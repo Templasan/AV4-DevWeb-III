@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -30,12 +31,14 @@ public class EmpresaControle {
     private EmpresaModelador modelador;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EmpresaExibirDTO> criar(@Valid @RequestBody EmpresaCadastrarDTO dto) {
         EmpresaExibirDTO empresaCriada = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(empresaCriada));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<EmpresaExibirDTO>> listar() {
         List<EmpresaExibirDTO> empresas = servico.buscarTodos();
         List<EmpresaExibirDTO> modelos = empresas.stream()
@@ -47,14 +50,16 @@ public class EmpresaControle {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<EmpresaExibirDTO> obterPorId(@PathVariable Long id) {
         EmpresaExibirDTO empresa = servico.buscarPorIdDTO(id);
         return ResponseEntity.ok(modelador.toModel(empresa));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EmpresaExibirDTO> atualizar(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody EmpresaAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -63,6 +68,7 @@ public class EmpresaControle {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servico.excluir(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

@@ -10,8 +10,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -20,10 +25,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class VendaControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
 
     private Long criarUsuario(String nome, String perfil) throws Exception {
         String json = String.format(java.util.Locale.US,"{\"nome\":\"%s\",\"perfis\":[\"%s\"]}", nome, perfil);
@@ -46,7 +61,7 @@ class VendaControleIT {
 
     private Long criarVenda() throws Exception {
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(vendaJson("VEND-" + System.currentTimeMillis(), clienteId, funcionarioId)))
@@ -124,14 +139,22 @@ class VendaControleIT {
     private Long criarVeiculo(String placa) throws Exception {
         Long proprietarioId = criarUsuario("Proprietário Veiculo", "CLIENTE");
         String json = String.format(java.util.Locale.US,
-            "{\"tipo\":\"CARRO\",\"modelo\":\"Modelo Test\",\"placa\":\"%s\",\"proprietarioId\":%d}",
+            "{\"tipo\":\"SEDA\",\"modelo\":\"Modelo Test\",\"placa\":\"%s\",\"proprietarioId\":%d}",
             placa, proprietarioId
         );
         MvcResult result = mockMvc.perform(post("/veiculos")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
                 .andReturn();
+
+        if (result.getResponse().getStatus() != 201) {
+            throw new RuntimeException(String.format(
+                "Erro ao criar veículo: status %d - %s",
+                result.getResponse().getStatus(),
+                result.getResponse().getContentAsString()
+            ));
+        }
+
         com.fasterxml.jackson.databind.JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
         if (response.get("id") == null) {
             throw new IllegalStateException("Veículo não foi criado: " + result.getResponse().getContentAsString());
@@ -143,7 +166,7 @@ class VendaControleIT {
     @Order(1)
     void criar_comDadosValidos_deveRetornar201() throws Exception {
         Long clienteId = criarUsuario("Cliente Teste", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Teste", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Teste", "VENDEDOR");
 
         mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -158,7 +181,7 @@ class VendaControleIT {
     @Test
     @Order(2)
     void criar_comClienteInexistente_deveRetornar404() throws Exception {
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -188,7 +211,7 @@ class VendaControleIT {
     @Order(5)
     void obterPorId_comIdExistente_deveRetornarVenda() throws Exception {
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -214,7 +237,7 @@ class VendaControleIT {
     @Order(7)
     void atualizar_comDadosValidos_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -236,7 +259,7 @@ class VendaControleIT {
     @Order(8)
     void deletar_comIdExistente_deveRetornar204() throws Exception {
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -263,7 +286,7 @@ class VendaControleIT {
     @Order(10)
     void criar_identificacaoDuplicada_deveRetornar400() throws Exception {
         Long clienteId = criarUsuario("Cliente Dup", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Dup", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Dup", "VENDEDOR");
 
         mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -282,7 +305,7 @@ class VendaControleIT {
     void criar_comMercadorias_deveRetornar201() throws Exception {
         Long empresaId = criarEmpresa("Empresa Teste");
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
         Long mercadoria1 = criarMercadoria("Óleo Motor", 50.0, empresaId);
         Long mercadoria2 = criarMercadoria("Filtro", 30.0, empresaId);
 
@@ -304,7 +327,7 @@ class VendaControleIT {
     void adicionarMercadoria_deveRetornar200() throws Exception {
         Long empresaId = criarEmpresa("Empresa Teste 2");
         Long clienteId = criarUsuario("Cliente 2", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário 2", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário 2", "VENDEDOR");
         Long mercadoria1 = criarMercadoria("Bobina", 100.0, empresaId);
         Long mercadoria2 = criarMercadoria("Bobina Extra", 100.0, empresaId);
 
@@ -332,7 +355,7 @@ class VendaControleIT {
     void removerMercadoria_deveRetornar200() throws Exception {
         Long empresaId = criarEmpresa("Empresa Teste 3");
         Long clienteId = criarUsuario("Cliente 3", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário 3", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário 3", "VENDEDOR");
         Long mercadoria1 = criarMercadoria("Produto A", 50.0, empresaId);
 
         String json = String.format(java.util.Locale.US,
@@ -356,7 +379,7 @@ class VendaControleIT {
     void adicionarServico_deveRetornar200() throws Exception {
         Long empresaId = criarEmpresa("Empresa Teste 4");
         Long clienteId = criarUsuario("Cliente 4", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário 4", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário 4", "VENDEDOR");
         Long servico1 = criarServico("Troca de Óleo", 80.0, empresaId);
 
         MvcResult result = mockMvc.perform(post("/vendas")
@@ -375,7 +398,7 @@ class VendaControleIT {
     @Order(15)
     void deletar_deveRemoverCompletamente() throws Exception {
         Long clienteId = criarUsuario("Cliente Delete", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Delete", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Delete", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -406,7 +429,7 @@ class VendaControleIT {
     void removerServico_deveRetornar200() throws Exception {
         Long empresaId = criarEmpresa("Empresa Servico");
         Long clienteId = criarUsuario("Cliente Servico", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Servico", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Servico", "VENDEDOR");
         Long servico1 = criarServico("Alinhamento", 60.0, empresaId);
 
         String json = String.format(java.util.Locale.US,
@@ -431,7 +454,7 @@ class VendaControleIT {
     @Order(17)
     void criar_semIdentificacao_deveRetornar400() throws Exception {
         Long clienteId = criarUsuario("Cliente Sem ID", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Sem ID", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Sem ID", "VENDEDOR");
 
         String json = String.format(java.util.Locale.US,"{\"clienteId\":%d,\"funcionarioId\":%d}", clienteId, funcionarioId);
         mockMvc.perform(post("/vendas")
@@ -444,7 +467,7 @@ class VendaControleIT {
     @Order(18)
     void criar_comIdentificacaoEmBranco_deveRetornar400() throws Exception {
         Long clienteId = criarUsuario("Cliente Branco", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Branco", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Branco", "VENDEDOR");
 
         String json = String.format(java.util.Locale.US,"{\"identificacao\":\"\",\"clienteId\":%d,\"funcionarioId\":%d}",
                 clienteId, funcionarioId);
@@ -458,7 +481,7 @@ class VendaControleIT {
     @Order(19)
     void atualizar_identificacao_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Update ID", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Update ID", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Update ID", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -481,7 +504,7 @@ class VendaControleIT {
     void criar_comMultiplasMercadoriasEServicos_deveRetornar201() throws Exception {
         Long empresaId = criarEmpresa("Empresa Completa");
         Long clienteId = criarUsuario("Cliente Completo", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Completo", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Completo", "VENDEDOR");
 
         Long mercadoria1 = criarMercadoria("Peça 1", 100.0, empresaId);
         Long mercadoria2 = criarMercadoria("Peça 2", 150.0, empresaId);
@@ -554,7 +577,7 @@ class VendaControleIT {
     @Order(33)
     void criar_vendaComMultiplasMercadoriasEServicos_deveRetornar201() throws Exception {
         Long clienteId = criarUsuario("Cliente Multiplo", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Multiplo", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Multiplo", "VENDEDOR");
         Long fornecedor1Id = criarFornecedor();
         Long mercadoria1Id = criarMercadoria("Merc1", 30.0, 5, fornecedor1Id);
         Long mercadoria2Id = criarMercadoria("Merc2", 40.0, 10, fornecedor1Id);
@@ -591,7 +614,7 @@ class VendaControleIT {
     @Order(35)
     void atualizar_venda_descricao_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Update", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Update", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Update", "VENDEDOR");
         Long vendaId = criarVenda();
 
         String updateJson = String.format(java.util.Locale.US,
@@ -643,7 +666,7 @@ class VendaControleIT {
     @Order(38)
     void obter_venda_comDados_completos() throws Exception {
         Long clienteId = criarUsuario("Cliente Completo", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Completo", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Completo", "VENDEDOR");
         Long fornecedorId = criarFornecedor();
         Long mercadoriaId = criarMercadoria("Completa", 60.0, 12, fornecedorId);
         Long servicoId = criarServico("Completa", 95.0);
@@ -672,7 +695,7 @@ class VendaControleIT {
     @Order(39)
     void criar_comIdentificacaoEmBranco_deveRetornar4000() throws Exception {
         Long clienteId = criarUsuario("Cliente Teste", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Teste", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Teste", "VENDEDOR");
 
         mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -685,7 +708,7 @@ class VendaControleIT {
     void atualizar_comIdentificacaoEmBranco_deveRetornar400() throws Exception {
         Long vendaId = criarVenda();
         Long clienteId = criarUsuario("Cliente Update", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Update", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Update", "VENDEDOR");
 
         String updateJson = String.format(java.util.Locale.US,
             "{\"identificacao\":\"   \",\"clienteId\":%d,\"funcionarioId\":%d}",
@@ -700,7 +723,7 @@ class VendaControleIT {
     @Test
     @Order(41)
     void criar_comClienteNuloExplicito_deveRetornar400() throws Exception {
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         String json = String.format(java.util.Locale.US,
             "{\"identificacao\":\"VEND-NULO-001\",\"clienteId\":null,\"funcionarioId\":%d}",
@@ -731,7 +754,7 @@ class VendaControleIT {
     @Order(43)
     void deletar_vendaComMercadoriasEServicos_deveRemoverCompleto() throws Exception {
         Long clienteId = criarUsuario("Cliente Delete", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Delete", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Delete", "VENDEDOR");
         Long fornecedor = criarFornecedor();
         Long mercadoria = criarMercadoria("Produto Delete", 35.0, 5, fornecedor);
         Long servico = criarServico("Serviço Delete", 85.0);
@@ -771,7 +794,7 @@ class VendaControleIT {
     @Order(45)
     void atualizar_trocandoIdentificacao_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Troca", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Troca", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Troca", "VENDEDOR");
         Long vendaId = criarVenda();
 
         String updateJson = String.format(java.util.Locale.US,
@@ -819,7 +842,7 @@ class VendaControleIT {
     @Order(48)
     void obter_vendaComTodasAsMercadorias_deveRetornarCompleta() throws Exception {
         Long clienteId = criarUsuario("Cliente Completo", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Completo", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Completo", "VENDEDOR");
         Long fornecedor = criarFornecedor();
         Long merc = criarMercadoria("Mercadoria Final", 99.99, 10, fornecedor);
         Long servico = criarServico("Serviço Final", 149.99);
@@ -878,7 +901,7 @@ class VendaControleIT {
     @Order(51)
     void adicionarVeiculo_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Veiculo", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Veiculo", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Veiculo", "VENDEDOR");
         Long veiculoId = criarVeiculo("ABC-1234");
 
         MvcResult result = mockMvc.perform(post("/vendas")
@@ -898,7 +921,7 @@ class VendaControleIT {
     @Order(52)
     void adicionarVeiculo_comVeiculoInexistente_deveRetornar404() throws Exception {
         Long clienteId = criarUsuario("Cliente", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -915,7 +938,7 @@ class VendaControleIT {
     @Order(53)
     void removerVeiculo_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Remove", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Remove", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Remove", "VENDEDOR");
         Long veiculoId = criarVeiculo("XYZ-9999");
 
         MvcResult result = mockMvc.perform(post("/vendas")
@@ -937,7 +960,7 @@ class VendaControleIT {
     @Order(54)
     void listarPorVeiculo_deveRetornar200() throws Exception {
         Long clienteId = criarUsuario("Cliente Filtro", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Filtro", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Filtro", "VENDEDOR");
         Long veiculoId = criarVeiculo("FIL-1111");
 
         MvcResult result1 = mockMvc.perform(post("/vendas")
@@ -963,7 +986,7 @@ class VendaControleIT {
     @Order(55)
     void obter_deveRetornarHATEOASLinks() throws Exception {
         Long clienteId = criarUsuario("Cliente HATEOAS", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário HATEOAS", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário HATEOAS", "VENDEDOR");
 
         MvcResult result = mockMvc.perform(post("/vendas")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -989,7 +1012,7 @@ class VendaControleIT {
     @Order(56)
     void obter_vendaComMercadorias_deveRetornarLinksIndividuais() throws Exception {
         Long clienteId = criarUsuario("Cliente Mercadoria", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Mercadoria", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Mercadoria", "VENDEDOR");
         Long fornecedor = criarFornecedor();
         Long merc1 = criarMercadoria("Mercadoria 1", 50.00, 5, fornecedor);
         Long merc2 = criarMercadoria("Mercadoria 2", 75.00, 10, fornecedor);
@@ -1018,7 +1041,7 @@ class VendaControleIT {
     @Order(57)
     void obter_vendaComServicos_deveRetornarLinksIndividuais() throws Exception {
         Long clienteId = criarUsuario("Cliente Servico", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Servico", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Servico", "VENDEDOR");
         Long servico1 = criarServico("Serviço 1", 100.00);
         Long servico2 = criarServico("Serviço 2", 150.00);
 
@@ -1046,7 +1069,7 @@ class VendaControleIT {
     @Order(58)
     void obter_vendaComVeiculo_deveRetornarLinksVeiculo() throws Exception {
         Long clienteId = criarUsuario("Cliente Vei Links", "CLIENTE");
-        Long funcionarioId = criarUsuario("Funcionário Vei Links", "FUNCIONARIO");
+        Long funcionarioId = criarUsuario("Funcionário Vei Links", "VENDEDOR");
         Long veiculoId = criarVeiculo("LINKS-001");
 
         MvcResult result = mockMvc.perform(post("/vendas")
@@ -1065,5 +1088,70 @@ class VendaControleIT {
                 .andExpect(jsonPath("$._links.vendas_do_veiculo.href").exists())
                 .andExpect(jsonPath("$._links.remover_veiculo.href").exists())
                 .andExpect(jsonPath("$._links.adicionar_veiculo.href").exists());
+    }
+
+    // -------------------------------------------------------------------------
+    // Testes das novas rotas de participação (cliente / funcionário separados)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void listarPorUsuarioComoCliente_deveRetornarVendasDoComprador() throws Exception {
+        Long clienteId = criarUsuario("Cliente Comprador", "CLIENTE");
+        Long funcionarioId = criarUsuario("Funcionário Vendedor", "VENDEDOR");
+
+        mockMvc.perform(post("/vendas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(vendaJson("VEND-CLIENTE-ROTA", clienteId, funcionarioId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/vendas/usuario/" + clienteId + "/cliente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.vendaExibirDTOList").isArray());
+    }
+
+    @Test
+    void listarPorUsuarioComoFuncionario_deveRetornarVendasDoVendedor() throws Exception {
+        Long clienteId = criarUsuario("Cliente Para Func", "CLIENTE");
+        Long funcionarioId = criarUsuario("Funcionário Da Venda", "VENDEDOR");
+
+        mockMvc.perform(post("/vendas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(vendaJson("VEND-FUNC-ROTA", clienteId, funcionarioId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/vendas/usuario/" + funcionarioId + "/funcionario"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._embedded.vendaExibirDTOList").isArray());
+    }
+
+    @Test
+    void listarPorUsuarioComoCliente_semVendas_deveRetornarListaVazia() throws Exception {
+        Long clienteId = criarUsuario("Cliente Sem Vendas", "CLIENTE");
+
+        mockMvc.perform(get("/vendas/usuario/" + clienteId + "/cliente"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listarPorUsuarioComoFuncionario_semVendas_deveRetornarListaVazia() throws Exception {
+        Long funcionarioId = criarUsuario("Funcionário Sem Vendas", "VENDEDOR");
+
+        mockMvc.perform(get("/vendas/usuario/" + funcionarioId + "/funcionario"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void listarPorUsuarioComoCliente_deveRetornarHATEOASLinks() throws Exception {
+        Long clienteId = criarUsuario("Cliente HATEOAS", "CLIENTE");
+        Long funcionarioId = criarUsuario("Funcionário HATEOAS", "VENDEDOR");
+
+        mockMvc.perform(post("/vendas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(vendaJson("VEND-HATEOAS-CLI", clienteId, funcionarioId)))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/vendas/usuario/" + clienteId + "/cliente"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$._links.self.href").exists());
     }
 }

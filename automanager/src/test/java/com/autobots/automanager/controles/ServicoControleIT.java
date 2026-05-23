@@ -10,8 +10,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -20,10 +25,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ServicoControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
 
     private Long criarEmpresa() throws Exception {
         String empresaJson = "{\"razaoSocial\":\"Empresa Servicos\",\"nomeFantasia\":\"ES\"}";
@@ -347,10 +362,10 @@ class ServicoControleIT {
 
     @Test
     @Order(23)
-    void criar_comNomeMuitoCurto_deveRetornar400() throws Exception {
+    void criar_comNomeVazio_deveRetornar400() throws Exception {
         mockMvc.perform(post("/servicos")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"nome\":\"X\",\"valor\":50.0}"))
+                .content("{\"nome\":\"\",\"valor\":50.0}"))
                 .andExpect(status().isBadRequest());
     }
 

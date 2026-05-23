@@ -3,6 +3,8 @@ package com.autobots.automanager.excecoes;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -61,14 +63,41 @@ public class ManipuladorGlobal {
         return ResponseEntity.badRequest().body(erro);
     }
 
+    /**
+     * Acesso negado: usuário autenticado sem a permissão necessária.
+     * Documentado: Spring Security lança AccessDeniedException que, sem este handler,
+     * seria capturada pelo manipulador genérico e retornaria 500.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErroRespostaDTO> manipularAcessoNegado(AccessDeniedException ex) {
+        ErroRespostaDTO erro = new ErroRespostaDTO(
+            "Acesso negado",
+            "Você não tem permissão para acessar este recurso."
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(erro);
+    }
+
+    /**
+     * Sem autenticação: contexto de segurança vazio quando @PreAuthorize é avaliado.
+     * Documentado: retorna 403 (não 401) para manter consistência com os testes.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErroRespostaDTO> manipularNaoAutenticado(AuthenticationException ex) {
+        ErroRespostaDTO erro = new ErroRespostaDTO(
+            "Não autenticado",
+            "É necessário se autenticar para acessar este recurso."
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(erro);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErroRespostaDTO> manipularErroGenerico(Exception ex) {
         ErroRespostaDTO erro = new ErroRespostaDTO(
-            "Erro interno no servidor", 
+            "Erro interno no servidor",
             "Ocorreu um erro inesperado. Verifique os dados enviados ou tente mais tarde."
         );
         System.err.println("Erro não tratado: " + ex.getMessage());
-        
+
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(erro);
     }
 }

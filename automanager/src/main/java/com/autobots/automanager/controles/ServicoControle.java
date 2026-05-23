@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -39,6 +40,7 @@ public class ServicoControle {
     private VendaModelador vendaModelador;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<ServicoExibirDTO> criar(@Valid @RequestBody ServicoCadastrarDTO dto) {
         ServicoExibirDTO servicoCriado = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(servicoCriado));
@@ -62,6 +64,7 @@ public class ServicoControle {
     }
 
     @GetMapping("/{id}/vendas")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<CollectionModel<VendaExibirDTO>> listarVendasDoServico(@PathVariable Long id) {
         // Busca as vendas que possuem este serviço através do VendaServico
         List<VendaExibirDTO> vendas = vendaServico.buscarPorServico(id);
@@ -76,8 +79,9 @@ public class ServicoControle {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<ServicoExibirDTO> atualizar(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody ServicoAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -86,6 +90,7 @@ public class ServicoControle {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servico.excluir(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

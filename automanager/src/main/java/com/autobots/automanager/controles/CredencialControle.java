@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -24,6 +25,7 @@ public class CredencialControle {
     private CredencialServico credencialServico;
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CredencialExibirDTO> adicionarCredencial(
             @PathVariable Long usuarioId,
             @Valid @RequestBody CredencialInputDTO dto) {
@@ -36,6 +38,7 @@ public class CredencialControle {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CollectionModel<CredencialExibirDTO>> listarCredenciais(
             @PathVariable Long usuarioId) {
         List<CredencialExibirDTO> credenciais = credencialServico.listarCredenciaisDoUsuario(usuarioId);
@@ -44,6 +47,7 @@ public class CredencialControle {
     }
 
     @PutMapping("/{credencialId}/senha")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<CredencialExibirDTO> atualizarSenha(
             @PathVariable Long usuarioId,
             @PathVariable Long credencialId,
@@ -57,6 +61,7 @@ public class CredencialControle {
     }
 
     @PutMapping("/{credencialId}/desativar")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> desativarCredencial(
             @PathVariable Long usuarioId,
             @PathVariable Long credencialId) {
@@ -69,6 +74,7 @@ public class CredencialControle {
     }
 
     @PutMapping("/{credencialId}/ativar")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> ativarCredencial(
             @PathVariable Long usuarioId,
             @PathVariable Long credencialId) {
@@ -81,6 +87,7 @@ public class CredencialControle {
     }
 
     @DeleteMapping("/{credencialId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> removerCredencial(
             @PathVariable Long usuarioId,
             @PathVariable Long credencialId) {

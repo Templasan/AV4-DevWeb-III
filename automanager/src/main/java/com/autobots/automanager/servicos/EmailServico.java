@@ -5,16 +5,20 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import com.autobots.automanager.dtos.Email.EmailAtualizarDTO;
 import com.autobots.automanager.dtos.Email.EmailCadastrarDTO;
 import com.autobots.automanager.dtos.Email.EmailExibirDTO;
 import com.autobots.automanager.entidades.Email;
 import com.autobots.automanager.entidades.Usuario;
+import com.autobots.automanager.enumeracoes.PerfilUsuario;
 import com.autobots.automanager.modelo.Email.EmailAtualizador;
 import com.autobots.automanager.modelo.Email.EmailSelecionador;
 import com.autobots.automanager.modelo.Usuario.UsuarioSelecionador;
 import com.autobots.automanager.repositorios.EmailRepositorio;
 import com.autobots.automanager.repositorios.UsuarioRepositorio;
+import com.autobots.automanager.seguranca.ContextoSeguranca;
 
 @Service
 public class EmailServico {
@@ -76,6 +80,16 @@ public class EmailServico {
 
     public EmailExibirDTO cadastrarViaDTO(EmailCadastrarDTO dto) {
         Usuario dono = usuarioSelecionador.selecionar(dto.getUsuarioId());
+
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            boolean ehSiMesmo = logado.getId().equals(dono.getId());
+            boolean ehCliente = dono.getPerfis().contains(PerfilUsuario.CLIENTE);
+            if (!ehSiMesmo && !ehCliente) {
+                throw new AccessDeniedException("Vendedor só pode gerenciar e-mails de clientes ou de si mesmo.");
+            }
+        }
+
         Email email = new Email();
         email.setEndereco(dto.getEndereco());
         dono.getEmails().add(email);
@@ -91,6 +105,21 @@ public class EmailServico {
 
     public void atualizarViaDTO(EmailAtualizarDTO dto) {
         Email email = selecionador.selecionar(dto.getId());
+
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            Usuario donoEmail = usuarioRepositorio.findAll().stream()
+                    .filter(u -> u.getEmails().contains(email))
+                    .findFirst().orElse(null);
+            if (donoEmail != null) {
+                boolean ehSiMesmo = logado.getId().equals(donoEmail.getId());
+                boolean ehCliente = donoEmail.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar e-mails de clientes ou de si mesmo.");
+                }
+            }
+        }
+
         Email dadosAtualizacao = new Email();
         dadosAtualizacao.setEndereco(dto.getEndereco());
         atualizador.atualizar(email, dadosAtualizacao);

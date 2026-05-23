@@ -33,6 +33,7 @@ public class EmailModelador implements RepresentationModelAssembler<EmailExibirD
         // 5. Link para o usuário dono
         if (idDono != null) {
             dto.add(linkTo(methodOn(UsuarioControle.class).obterPorId(idDono)).withRel("dono"));
+            dto.add(linkTo(methodOn(EmailControle.class).listarPorUsuario(idDono)).withRel("emails_do_dono"));
         }
 
         return dto;

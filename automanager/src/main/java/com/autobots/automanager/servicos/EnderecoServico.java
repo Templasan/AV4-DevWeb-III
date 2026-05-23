@@ -6,12 +6,15 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import com.autobots.automanager.dtos.Endereco.EnderecoAtualizarDTO;
 import com.autobots.automanager.dtos.Endereco.EnderecoCadastrarDTO;
 import com.autobots.automanager.dtos.Endereco.EnderecoExibirDTO;
 import com.autobots.automanager.entidades.Usuario;
 import com.autobots.automanager.entidades.Empresa;
 import com.autobots.automanager.entidades.Endereco;
+import com.autobots.automanager.enumeracoes.PerfilUsuario;
 import com.autobots.automanager.excecoes.personalizado.EntidadeNaoEncontradaException;
 import com.autobots.automanager.modelo.Usuario.UsuarioSelecionador;
 import com.autobots.automanager.modelo.Empresa.EmpresaSelecionador;
@@ -20,6 +23,7 @@ import com.autobots.automanager.modelo.Endereco.EnderecoSelecionador;
 import com.autobots.automanager.repositorios.UsuarioRepositorio;
 import com.autobots.automanager.repositorios.EmpresaRepositorio;
 import com.autobots.automanager.repositorios.EnderecoRepositorio;
+import com.autobots.automanager.seguranca.ContextoSeguranca;
 
 @Service
 public class EnderecoServico {
@@ -90,6 +94,21 @@ public class EnderecoServico {
         Endereco endereco = new Endereco();
         preencherDados(endereco, dto);
 
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            if ("EMPRESA".equalsIgnoreCase(dto.getTipoDono())) {
+                throw new AccessDeniedException("Vendedor não pode gerenciar endereços de empresas.");
+            }
+            if ("USUARIO".equalsIgnoreCase(dto.getTipoDono())) {
+                Usuario alvo = usuarioSelecionador.selecionar(dto.getIdDono());
+                boolean ehSiMesmo = logado.getId().equals(alvo.getId());
+                boolean ehCliente = alvo.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar endereços de clientes ou de si mesmo.");
+                }
+            }
+        }
+
         if ("USUARIO".equalsIgnoreCase(dto.getTipoDono())) {
             Usuario dono = usuarioSelecionador.selecionar(dto.getIdDono());
             if (dono.getEndereco() != null) {
@@ -114,6 +133,28 @@ public class EnderecoServico {
 
     public void atualizarViaDTO(EnderecoAtualizarDTO dto) {
         Endereco endereco = selecionador.selecionar(dto.getId());
+
+        Usuario logadoAtualizar = ContextoSeguranca.getUsuario();
+        if (logadoAtualizar != null && logadoAtualizar.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            // Verifica se o endereço pertence a uma empresa
+            boolean pertenceEmpresa = empresaRepositorio.findAll().stream()
+                    .anyMatch(e -> e.getEndereco() != null && e.getEndereco().getId().equals(dto.getId()));
+            if (pertenceEmpresa) {
+                throw new AccessDeniedException("Vendedor não pode gerenciar endereços de empresas.");
+            }
+            // Verifica se o usuário dono é CLIENTE ou si mesmo
+            Usuario donoEndereco = usuarioRepositorio.findAll().stream()
+                    .filter(u -> u.getEndereco() != null && u.getEndereco().getId().equals(dto.getId()))
+                    .findFirst().orElse(null);
+            if (donoEndereco != null) {
+                boolean ehSiMesmo = logadoAtualizar.getId().equals(donoEndereco.getId());
+                boolean ehCliente = donoEndereco.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar endereços de clientes ou de si mesmo.");
+                }
+            }
+        }
+
         Endereco dadosAtualizacao = new Endereco();
         dadosAtualizacao.setEstado(dto.getEstado());
         dadosAtualizacao.setCidade(dto.getCidade());

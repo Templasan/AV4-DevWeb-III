@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 
@@ -29,12 +30,14 @@ public class TelefoneControle {
     private TelefoneModelador modelador;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<TelefoneExibirDTO> criar(@Valid @RequestBody TelefoneCadastrarDTO dto) {
         TelefoneExibirDTO telefoneCriado = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(telefoneCriado));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<TelefoneExibirDTO>> listar() {
         List<TelefoneExibirDTO> telefones = servico.buscarTodos();
         List<TelefoneExibirDTO> modelos = telefones.stream()
@@ -45,12 +48,14 @@ public class TelefoneControle {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<TelefoneExibirDTO> obterPorId(@PathVariable Long id) {
         TelefoneExibirDTO telefone = servico.buscarPorIdDTO(id);
         return ResponseEntity.ok(modelador.toModel(telefone));
     }
 
     @GetMapping("/usuario/{usuarioId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isProprioUsuario(#usuarioId)")
     public ResponseEntity<CollectionModel<TelefoneExibirDTO>> listarPorUsuario(@PathVariable Long usuarioId) {
         List<TelefoneExibirDTO> telefones = servico.buscarPorUsuario(usuarioId);
         
@@ -64,6 +69,7 @@ public class TelefoneControle {
     }
 
     @GetMapping("/empresa/{empresaId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<TelefoneExibirDTO>> listarPorEmpresa(@PathVariable Long empresaId) {
         List<TelefoneExibirDTO> telefones = servico.buscarPorEmpresa(empresaId);
         
@@ -77,8 +83,9 @@ public class TelefoneControle {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<TelefoneExibirDTO> atualizar(
-            @PathVariable Long id, 
+            @PathVariable Long id,
             @Valid @RequestBody TelefoneAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -87,6 +94,7 @@ public class TelefoneControle {
     }
 
     @DeleteMapping("/{id}/{idDono}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<Void> deletar(@PathVariable Long id, @PathVariable Long idDono) {
         servico.excluir(id, idDono);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

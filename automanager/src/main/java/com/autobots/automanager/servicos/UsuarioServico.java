@@ -7,16 +7,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import com.autobots.automanager.dtos.Usuario.UsuarioAtualizarDTO;
 import com.autobots.automanager.dtos.Usuario.UsuarioCadastrarDTO;
 import com.autobots.automanager.dtos.Usuario.UsuarioExibirDTO;
 import com.autobots.automanager.dtos.Email.EmailExibirDTO;
 import com.autobots.automanager.dtos.Endereco.EnderecoExibirDTO;
 import com.autobots.automanager.entidades.*;
+import com.autobots.automanager.enumeracoes.PerfilUsuario;
 import com.autobots.automanager.modelo.Empresa.EmpresaSelecionador;
 import com.autobots.automanager.modelo.Usuario.UsuarioAtualizador;
 import com.autobots.automanager.modelo.Usuario.UsuarioSelecionador;
 import com.autobots.automanager.repositorios.UsuarioRepositorio;
+import com.autobots.automanager.seguranca.ContextoSeguranca;
 
 @Service
 @Transactional
@@ -57,6 +61,12 @@ public class UsuarioServico {
 
     public void excluir(Long id) {
         Usuario usuario = selecionador.selecionar(id);
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            if (!usuario.getPerfis().contains(PerfilUsuario.CLIENTE)) {
+                throw new AccessDeniedException("Vendedor só pode excluir usuários com perfil CLIENTE.");
+            }
+        }
         repositorio.delete(usuario);
     }
 
@@ -130,12 +140,28 @@ public class UsuarioServico {
             });
         }
 
+        Usuario logadoCadastrar = ContextoSeguranca.getUsuario();
+        if (logadoCadastrar != null && logadoCadastrar.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            boolean somenteCriaCliente = dto.getPerfis() != null
+                    && !dto.getPerfis().isEmpty()
+                    && dto.getPerfis().stream().allMatch(p -> p == PerfilUsuario.CLIENTE);
+            if (!somenteCriaCliente) {
+                throw new AccessDeniedException("Vendedor só pode cadastrar usuários com perfil CLIENTE.");
+            }
+        }
+
         repositorio.save(usuario);
         return converterParaExibirDTO(usuario);
     }
 
     public void atualizarViaDTO(UsuarioAtualizarDTO dto) {
         Usuario usuario = selecionador.selecionar(dto.getId());
+        Usuario logadoAtualizar = ContextoSeguranca.getUsuario();
+        if (logadoAtualizar != null && logadoAtualizar.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            if (!usuario.getPerfis().contains(PerfilUsuario.CLIENTE)) {
+                throw new AccessDeniedException("Vendedor só pode atualizar usuários com perfil CLIENTE.");
+            }
+        }
         Usuario dadosAtualizacao = new Usuario();
         dadosAtualizacao.setNome(dto.getNome());
         dadosAtualizacao.setNomeSocial(dto.getNomeSocial());

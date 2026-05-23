@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import javax.validation.Valid;
 
@@ -28,12 +29,14 @@ public class EmailControle {
     private EmailModelador modelador;
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<EmailExibirDTO> criar(@Valid @RequestBody EmailCadastrarDTO dto) {
         EmailExibirDTO criado = servico.cadastrarViaDTO(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(modelador.toModel(criado));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<CollectionModel<EmailExibirDTO>> listar() {
         List<EmailExibirDTO> emails = servico.buscarTodos();
         List<EmailExibirDTO> modelos = emails.stream()
@@ -44,12 +47,14 @@ public class EmailControle {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<EmailExibirDTO> obterPorId(@PathVariable Long id) {
         EmailExibirDTO email = servico.buscarPorIdDTO(id);
         return ResponseEntity.ok(modelador.toModel(email));
     }
 
     @GetMapping("/usuario/{usuarioId}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE') || @segurancaUtil.isProprioUsuario(#usuarioId)")
     public ResponseEntity<CollectionModel<EmailExibirDTO>> listarPorUsuario(@PathVariable Long usuarioId) {
         List<EmailExibirDTO> emails = servico.buscarPorUsuario(usuarioId);
         
@@ -63,6 +68,7 @@ public class EmailControle {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE','VENDEDOR')")
     public ResponseEntity<EmailExibirDTO> atualizar(@PathVariable Long id, @Valid @RequestBody EmailAtualizarDTO dto) {
         dto.setId(id);
         servico.atualizarViaDTO(dto);
@@ -71,6 +77,7 @@ public class EmailControle {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','GERENTE')")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         servico.excluir(id);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();

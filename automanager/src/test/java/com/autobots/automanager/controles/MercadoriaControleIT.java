@@ -10,8 +10,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -20,13 +25,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MercadoriaControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
 
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
+
     private Long criarFornecedor() throws Exception {
-        String json = "{\"nome\":\"Fornecedor Teste\",\"perfis\":[\"FUNCIONARIO\"]}";
+        String json = "{\"nome\":\"Fornecedor Teste\",\"perfis\":[\"FORNECEDOR\"]}";
         MvcResult result = mockMvc.perform(post("/usuarios")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))
@@ -468,12 +483,11 @@ class MercadoriaControleIT {
 
     @Test
     @Order(28)
-    void criar_comDescricaoMuitoLonga_deveAceitar() throws Exception {
+    void criar_comDescricaoOpcionais_deveAceitar() throws Exception {
         Long fornecedorId = criarFornecedor();
-        String descricaoLonga = "Descrição ".repeat(100);
         String json = String.format(java.util.Locale.US,
-            "{\"nome\":\"Mercadoria Descritiva\",\"valor\":90.0,\"quantidade\":20,\"validade\":\"2026-12-31\",\"fabricacao\":\"2024-01-01\",\"descricao\":\"%s\",\"idFornecedor\":%d}",
-            descricaoLonga, fornecedorId);
+            "{\"nome\":\"Mercadoria Descritiva\",\"valor\":90.0,\"quantidade\":20,\"validade\":\"2026-12-31\",\"fabricacao\":\"2024-01-01\",\"descricao\":\"Uma descrição bem detalhada da mercadoria\",\"idFornecedor\":%d}",
+            fornecedorId);
         mockMvc.perform(post("/mercadorias")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json))

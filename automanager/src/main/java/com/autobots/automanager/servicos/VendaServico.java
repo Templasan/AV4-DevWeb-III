@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.autobots.automanager.dtos.Mercadoria.MercadoriaExibirDTO;
 import com.autobots.automanager.dtos.Venda.VendaAtualizarDTO;
 import com.autobots.automanager.dtos.Venda.VendaCadastrarDTO;
 import com.autobots.automanager.dtos.Venda.VendaExibirDTO;
@@ -75,12 +76,20 @@ public class VendaServico {
                 .collect(Collectors.toList());
     }
 
-    // Filtro para UsuarioControle (Atende Clientes ou Funcionários)
-    public List<VendaExibirDTO> listarPorUsuario(Long usuarioId) {
+    // Vendas onde o usuário foi o COMPRADOR (cliente)
+    public List<VendaExibirDTO> listarPorUsuarioComoCliente(Long usuarioId) {
         Usuario usuario = usuarioSelecionador.selecionar(usuarioId);
         return repositorio.findAll().stream()
-                .filter(v -> (v.getCliente() != null && v.getCliente().equals(usuario))
-                          || (v.getFuncionario() != null && v.getFuncionario().equals(usuario)))
+                .filter(v -> v.getCliente() != null && v.getCliente().equals(usuario))
+                .map(this::converterParaExibirDTO)
+                .collect(Collectors.toList());
+    }
+
+    // Vendas onde o usuário foi o VENDEDOR (funcionário)
+    public List<VendaExibirDTO> listarPorUsuarioComoFuncionario(Long usuarioId) {
+        Usuario usuario = usuarioSelecionador.selecionar(usuarioId);
+        return repositorio.findAll().stream()
+                .filter(v -> v.getFuncionario() != null && v.getFuncionario().equals(usuario))
                 .map(this::converterParaExibirDTO)
                 .collect(Collectors.toList());
     }
@@ -221,6 +230,21 @@ public class VendaServico {
             dto.setMercadoriasIds(v.getMercadorias().stream()
                     .map(Mercadoria::getId)
                     .collect(Collectors.toSet()));
+            // Embute os objetos completos para que CLIENTE veja os dados sem acessar /mercadorias
+            dto.setMercadorias(v.getMercadorias().stream()
+                    .map(m -> {
+                        MercadoriaExibirDTO md = new MercadoriaExibirDTO();
+                        md.setId(m.getId());
+                        md.setNome(m.getNome());
+                        md.setDescricao(m.getDescricao());
+                        md.setQuantidade(m.getQuantidade());
+                        md.setValor(m.getValor());
+                        md.setValidade(m.getValidade());
+                        md.setFabricacao(m.getFabricacao());
+                        md.setCadastro(m.getCadastro());
+                        return md;
+                    })
+                    .collect(Collectors.toList()));
         }
 
         if (v.getServicos() != null && !v.getServicos().isEmpty()) {

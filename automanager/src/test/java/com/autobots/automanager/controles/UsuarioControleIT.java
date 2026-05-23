@@ -10,8 +10,13 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -20,10 +25,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UsuarioControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
 
     private final String usuarioClienteJson = """
             {
@@ -36,7 +51,7 @@ class UsuarioControleIT {
     private final String usuarioFuncionarioJson = """
             {
               "nome": "Ana Funcionária",
-              "perfis": ["FUNCIONARIO"]
+              "perfis": ["VENDEDOR"]
             }
             """;
 
@@ -250,7 +265,7 @@ class UsuarioControleIT {
         String jsonMultiPerfis = """
                 {
                   "nome": "Usuário Multi-Perfil",
-                  "perfis": ["CLIENTE", "FUNCIONARIO"]
+                  "perfis": ["CLIENTE", "VENDEDOR"]
                 }
                 """;
         mockMvc.perform(post("/usuarios")
@@ -322,7 +337,7 @@ class UsuarioControleIT {
         Long id = objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asLong();
 
         String updateJson = String.format(java.util.Locale.US,
-            "{\"id\":%d,\"nome\":\"João Silva\",\"perfis\":[\"FUNCIONARIO\"]}", id);
+            "{\"id\":%d,\"nome\":\"João Silva\",\"perfis\":[\"VENDEDOR\"]}", id);
         mockMvc.perform(put("/usuarios/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(updateJson))
@@ -473,7 +488,7 @@ class UsuarioControleIT {
         String json = """
                 {
                   "nome": "Usuário Multi-Perfil Completo",
-                  "perfis": ["CLIENTE", "FUNCIONARIO"]
+                  "perfis": ["CLIENTE", "VENDEDOR"]
                 }
                 """;
         mockMvc.perform(post("/usuarios")
@@ -573,14 +588,15 @@ class UsuarioControleIT {
                 .andExpect(jsonPath("$._links.telefones.href").exists())
                 .andExpect(jsonPath("$._links.endereco.href").exists())
                 .andExpect(jsonPath("$._links.veiculos.href").exists())
-                .andExpect(jsonPath("$._links.vendas.href").exists())
+                .andExpect(jsonPath("$._links['vendas-como-cliente'].href").exists())
                 .andExpect(jsonPath("$._links.mercadorias_fornecidas.href").exists());
     }
 
     @Test
     void obter_usuarioComEndereco_deveRetornarEnderecoModelado() throws Exception {
         String usuarioJson = "{\"nome\":\"Usuario com Endereco\",\"perfis\":[\"CLIENTE\"]," +
-                "\"endereco\":{\"rua\":\"Rua Test\",\"numero\":123,\"bairro\":\"Bairro\",\"cidade\":\"Cidade\"}}";
+                "\"endereco\":{\"rua\":\"Rua Test\",\"numero\":\"123\",\"bairro\":\"Bairro\"," +
+                "\"cidade\":\"Cidade\",\"estado\":\"SP\",\"codigoPostal\":\"01000-000\"}}";
 
         MvcResult result = mockMvc.perform(post("/usuarios")
                 .contentType(MediaType.APPLICATION_JSON)

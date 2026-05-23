@@ -7,17 +7,21 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.access.AccessDeniedException;
+
 import com.autobots.automanager.dtos.Documento.DocumentoAtualizarDTO;
 import com.autobots.automanager.dtos.Documento.DocumentoCadastrarDTO;
 import com.autobots.automanager.dtos.Documento.DocumentoExibirDTO;
 import com.autobots.automanager.entidades.Documento;
 import com.autobots.automanager.entidades.Usuario;
+import com.autobots.automanager.enumeracoes.PerfilUsuario;
 import com.autobots.automanager.excecoes.personalizado.EntidadeNaoEncontradaException;
 import com.autobots.automanager.modelo.Documento.DocumentoAtualizador;
 import com.autobots.automanager.modelo.Documento.DocumentoSelecionador;
 import com.autobots.automanager.modelo.Usuario.UsuarioSelecionador;
 import com.autobots.automanager.repositorios.DocumentoRepositorio;
 import com.autobots.automanager.repositorios.UsuarioRepositorio;
+import com.autobots.automanager.seguranca.ContextoSeguranca;
 
 @Service
 public class DocumentoServico {
@@ -107,6 +111,15 @@ public class DocumentoServico {
     public DocumentoExibirDTO cadastrarViaDTO(DocumentoCadastrarDTO dto) {
         Usuario dono = usuarioSelecionador.selecionar(dto.getUsuarioId());
 
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            boolean ehSiMesmo = logado.getId().equals(dono.getId());
+            boolean ehCliente = dono.getPerfis().contains(PerfilUsuario.CLIENTE);
+            if (!ehSiMesmo && !ehCliente) {
+                throw new AccessDeniedException("Vendedor só pode gerenciar documentos de clientes ou de si mesmo.");
+            }
+        }
+
         Documento novoDocumento = new Documento();
         novoDocumento.setTipo(dto.getTipo());
         novoDocumento.setNumero(dto.getNumero());
@@ -125,6 +138,20 @@ public class DocumentoServico {
 
     public void atualizarViaDTO(DocumentoAtualizarDTO dto) {
         Documento documento = selecionador.selecionar(dto.getId());
+
+        Usuario logado = ContextoSeguranca.getUsuario();
+        if (logado != null && logado.getPerfis().contains(PerfilUsuario.VENDEDOR)) {
+            Usuario donoDoc = usuarioRepositorio.findAll().stream()
+                    .filter(u -> u.getDocumentos().stream().anyMatch(d -> d.getId().equals(dto.getId())))
+                    .findFirst().orElse(null);
+            if (donoDoc != null) {
+                boolean ehSiMesmo = logado.getId().equals(donoDoc.getId());
+                boolean ehCliente = donoDoc.getPerfis().contains(PerfilUsuario.CLIENTE);
+                if (!ehSiMesmo && !ehCliente) {
+                    throw new AccessDeniedException("Vendedor só pode gerenciar documentos de clientes ou de si mesmo.");
+                }
+            }
+        }
 
         Documento dadosAtualizacao = new Documento();
         dadosAtualizacao.setNumero(dto.getNumero());

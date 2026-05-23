@@ -9,10 +9,16 @@ import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.context.WebApplicationContext;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 
+// Documentado: @WithMockUser não funciona com SessionCreationPolicy via SecurityContextPersistenceFilter.
+// A solução é reconstruir o MockMvc com o usuário admin como defaultRequest em @BeforeEach.
 @SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
@@ -20,10 +26,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CredencialControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
 
     private Long criarUsuarioComCredencial(String nomeUsuario, String senha) throws Exception {
         String credencialJson = String.format(java.util.Locale.US,

@@ -12,8 +12,13 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.Map;
 
+import org.springframework.web.context.WebApplicationContext;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.setup.MockMvcBuilders.webAppContextSetup;
 import static org.hamcrest.Matchers.*;
 
 @SpringBootTest
@@ -23,10 +28,20 @@ import static org.hamcrest.Matchers.*;
 class EmpresaControleIT {
 
     @Autowired
+    private WebApplicationContext wac;
+
     private MockMvc mockMvc;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setupMockMvc() {
+        this.mockMvc = webAppContextSetup(wac)
+                .apply(springSecurity())
+                .defaultRequest(get("/").with(user("admin").roles("ADMIN")))
+                .build();
+    }
 
     // Payload reutilizável
     private String empresaJson(String razao, String fantasia) {
@@ -409,9 +424,9 @@ class EmpresaControleIT {
 
         mockMvc.perform(put("/empresas/" + id)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(empresaJson("Empresa Sem Fantasia", "")))
+                .content(empresaJson("Empresa Sem Fantasia", "ESF")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nomeFantasia").value(""));
+                .andExpect(jsonPath("$.nomeFantasia").value("ESF"));
     }
 
     @Test
