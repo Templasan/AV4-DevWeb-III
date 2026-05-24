@@ -1,6 +1,7 @@
 package com.autobots.automanager.servicos;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,9 @@ public class CredencialServico {
     @Autowired
     private UsuarioSelecionador usuarioSelecionador;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     public CredencialExibirDTO adicionarCredencial(Long usuarioId, CredencialInputDTO dto) {
         Usuario usuario = usuarioSelecionador.selecionar(usuarioId);
 
@@ -45,7 +49,7 @@ public class CredencialServico {
 
             CredencialUsuarioSenha cred = new CredencialUsuarioSenha();
             cred.setNomeUsuario(dto.getNomeUsuario());
-            cred.setSenha(dto.getSenha());
+            cred.setSenha(passwordEncoder.encode(dto.getSenha())); // Hash da senha
             cred.setCriacao(new Date());
             cred.setInativo(false);
             credencial = credencialRepositorio.save(cred);
@@ -69,7 +73,7 @@ public class CredencialServico {
         CredencialUsuarioSenha credencial = credencialUsuarioSenhaRepositorio.findById(credencialId)
                 .orElseThrow(() -> new IllegalArgumentException("Credencial não encontrada"));
 
-        credencial.setSenha(novaSenha);
+        credencial.setSenha(passwordEncoder.encode(novaSenha)); // Hash da nova senha
         credencial.setUltimoAcesso(new Date());
         credencialUsuarioSenhaRepositorio.save(credencial);
 

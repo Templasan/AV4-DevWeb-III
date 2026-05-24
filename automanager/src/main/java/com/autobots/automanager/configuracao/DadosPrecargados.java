@@ -3,6 +3,7 @@ package com.autobots.automanager.configuracao;
 import java.util.Date;
 
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import com.autobots.automanager.entidades.CredencialUsuarioSenha;
@@ -18,9 +19,11 @@ import com.autobots.automanager.repositorios.UsuarioRepositorio;
 public class DadosPrecargados implements CommandLineRunner {
 
 	private final UsuarioRepositorio usuarioRepositorio;
+	private final PasswordEncoder passwordEncoder;
 
-	public DadosPrecargados(UsuarioRepositorio usuarioRepositorio) {
+	public DadosPrecargados(UsuarioRepositorio usuarioRepositorio, PasswordEncoder passwordEncoder) {
 		this.usuarioRepositorio = usuarioRepositorio;
+		this.passwordEncoder = passwordEncoder;
 	}
 
 	@Override
@@ -37,7 +40,7 @@ public class DadosPrecargados implements CommandLineRunner {
 		admin.setNome("Administrador Sistema");
 		CredencialUsuarioSenha credAdmin = new CredencialUsuarioSenha();
 		credAdmin.setNomeUsuario("admin");
-		credAdmin.setSenha("admin123");
+		credAdmin.setSenha(passwordEncoder.encode("admin123"));
 		credAdmin.setCriacao(agora);
 		credAdmin.setInativo(false);
 		admin.getCredenciais().add(credAdmin);
@@ -49,7 +52,7 @@ public class DadosPrecargados implements CommandLineRunner {
 		gerente.setNome("Gerente Loja");
 		CredencialUsuarioSenha credGerente = new CredencialUsuarioSenha();
 		credGerente.setNomeUsuario("gerente");
-		credGerente.setSenha("gerente123");
+		credGerente.setSenha(passwordEncoder.encode("gerente123"));
 		credGerente.setCriacao(agora);
 		credGerente.setInativo(false);
 		gerente.getCredenciais().add(credGerente);
@@ -61,7 +64,7 @@ public class DadosPrecargados implements CommandLineRunner {
 		vendedor.setNome("João Vendedor");
 		CredencialUsuarioSenha credVendedor = new CredencialUsuarioSenha();
 		credVendedor.setNomeUsuario("vendedor");
-		credVendedor.setSenha("vendedor123");
+		credVendedor.setSenha(passwordEncoder.encode("vendedor123"));
 		credVendedor.setCriacao(agora);
 		credVendedor.setInativo(false);
 		vendedor.getCredenciais().add(credVendedor);
@@ -73,7 +76,7 @@ public class DadosPrecargados implements CommandLineRunner {
 		cliente.setNome("Maria Cliente");
 		CredencialUsuarioSenha credCliente = new CredencialUsuarioSenha();
 		credCliente.setNomeUsuario("cliente");
-		credCliente.setSenha("cliente123");
+		credCliente.setSenha(passwordEncoder.encode("cliente123"));
 		credCliente.setCriacao(agora);
 		credCliente.setInativo(false);
 		cliente.getCredenciais().add(credCliente);

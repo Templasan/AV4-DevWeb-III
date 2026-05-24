@@ -1,6 +1,7 @@
 package com.autobots.automanager.servicos;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,9 @@ public class AutenticacaoServico {
     @Autowired
     private ProvedorJwt provedorJwt;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     public LoginResponseDTO login(LoginDTO loginDTO) {
         CredencialUsuarioSenha credencial = credencialRepositorio
                 .findByNomeUsuario(loginDTO.getNomeUsuario())
@@ -41,7 +45,8 @@ public class AutenticacaoServico {
             throw new IllegalArgumentException("Usuário inativo");
         }
 
-        if (!credencial.getSenha().equals(loginDTO.getSenha())) {
+        // Comparar senha fornecida com hash armazenado
+        if (!passwordEncoder.matches(loginDTO.getSenha(), credencial.getSenha())) {
             throw new IllegalArgumentException("Usuário ou senha inválidos");
         }
 
