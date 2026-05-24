@@ -54,9 +54,11 @@ O sistema possui **4 tipos de usuários** com permissões específicas:
 ## 🚀 Como Começar
 
 ### **1. Iniciar a Aplicação**
-
+Preferivel rodar pela IDE. (JAVA Extension)
 ```bash
-mvn spring-boot:run
+mvnw spring-boot:run
+
+(possivel ter que configurar o JAVA_HOME)
 ```
 
 A aplicação criará automaticamente os 4 usuários de teste (veja tabela acima).
